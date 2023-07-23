@@ -161,7 +161,7 @@ class SATL:
 
             for result in all_results:
                 results = pd.concat((results, result), ignore_index=True)
-            results.to_csv(self.path_out + mode + "_pred.csv")
+            results.to_csv('./results/' + self.path_out + mode + "_pred.csv")
             scores = get_all_for_desc(results, combs, True, self.path_out + str(j) + "_" + mode + "_h.csv")
         return
 
@@ -216,8 +216,8 @@ class SATL:
 
         for result in all_results:
             results = pd.concat((results, result), ignore_index=True)
-        results.to_csv(self.path_out + "_pred.csv")
-        scores = get_all(results, True, self.path_out + "_h.csv")
+        results.to_csv('./results/' + self.path_out + "_pred.csv")
+        scores = get_all(results, True, './results/' + self.path_out + "_h.csv")
         return
 
     def run_combination(self, X_source, X_train, X_test, y_source, y_train, y_test, comb, cols, pseudo):

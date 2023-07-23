@@ -23,9 +23,9 @@ def main(n_jobs:int, scenario:dict):
     root_dir = "./dataset/datasets/"
     dataset = preset_mousehuman_load(root_dir, organ, prep)
 
-    out_dir = f'./results/satl_mouse_to_human/MouseToHuman_{organ}_{prep}_seed_{seed}_K_{thisK}_over_{oversample}_ndim_{ndim}'
+    out_dir = f'satl_mouse_to_human/MouseToHuman_{organ}_{prep}_seed_{seed}_K_{thisK}_over_{oversample}_ndim_{ndim}'
 
-    if os.path.exists(out_dir + '_pred.csv'):
+    if os.path.exists('./results/' + out_dir + '_pred.csv'):
         print('skip')
         return
 

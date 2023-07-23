@@ -319,6 +319,6 @@ def plot_latent(z_source, source_labels, z_target, hy_test, pred, remove_col, fi
     ax1.legend(bbox_to_anchor=(1.04,0.50), loc='lower left')
     ax2.legend(bbox_to_anchor=(1.04,0.00), loc='lower left')
     ax3.legend(bbox_to_anchor=(1.04,0.00), loc='lower left')
-    plt.savefig(filename, bbox_inches='tight')
+    plt.savefig('./plots/' + filename, bbox_inches='tight')
 
     return
