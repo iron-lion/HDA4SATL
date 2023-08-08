@@ -133,14 +133,23 @@ def preset_mousehuman_load(root_dir, organ_name, prep):
     PATH_in_target_train_label = root_dir + organ_dir + "human_red_train_label.csv"
     PATH_in_target_test = root_dir + organ_dir + "human_red_test_" + prep_dir
     PATH_in_target_test_label = root_dir + organ_dir + "human_red_test_label.csv"
+    
+    X_source = pd.read_csv(PATH_in_source, index_col=0)
+    X_target = pd.read_csv(PATH_in_target_train, index_col=0)
+    target_columns = X_target.columns
+    source_columns = X_source.columns
 
     dataset = {
-        'X_source': pd.read_csv(PATH_in_source, index_col=0).to_numpy(),
+        'X_source': X_source.to_numpy(),
         'y_source': pd.read_csv(PATH_in_source_label, index_col=0)["label"].to_numpy("int32"),
-        'X_train': pd.read_csv(PATH_in_target_train, index_col=0).to_numpy(),
+        'X_train': X_target.to_numpy(),
         'y_train': pd.read_csv(PATH_in_target_train_label, index_col=0)["label"].to_numpy("int32"),
         'X_test': pd.read_csv(PATH_in_target_test, index_col=0).to_numpy(),
         'y_test': pd.read_csv(PATH_in_target_test_label, index_col=0)["label"].to_numpy("int32"),
+        'id_source' : source_columns,
+        'id_target' : target_columns,
+        'fi_source' : None,
+        'fi_target' : None,
     }
 
     return dataset
@@ -223,12 +232,18 @@ def lps_stimulate_load(root_dir: str, source: str, target: str, latent_dim=None)
     source, source_labels = _get_data(root_dir, source)
     target_labels = np.array(target_labels, dtype='int32')
     source_labels = np.array(source_labels, dtype='int32')
+    target_columns = target.columns
+    source_columns = source.columns
     if latent_dim is not None:
         target = latent_dim.fit_transform(target)
+        target_fi = latent_dim.components_
         source = latent_dim.fit_transform(source)
+        source_fi = latent_dim.components_
     else:
         target = np.array(target)
         source = np.array(source)
+        target_fi = None
+        source_fi = None
 
     SKF = StratifiedKFold(n_splits=5).split(target, target_labels)
     for train_index, test_index in SKF:
@@ -242,6 +257,10 @@ def lps_stimulate_load(root_dir: str, source: str, target: str, latent_dim=None)
             'y_train': hy_train,
             'X_test': hX_test,
             'y_test': hy_test,
+            'id_source' : source_columns,
+            'id_target' : target_columns,
+            'fi_source' : source_fi,
+            'fi_target' : target_fi,
         }
 
         return dataset
@@ -268,6 +287,8 @@ def baron_load(root_dir, latent_dim=None):
     source_labels = pd.read_csv(f'{root_dir}norm_mouse_label.csv', index_col=0, header=0)
     target = target.T
     source = source.T
+    target_columns = target.columns
+    source_columns = source.columns
     target_labels = target_labels.T.values.tolist()[0]
     source_labels = source_labels.T.values.tolist()[0]
     ##
@@ -310,6 +331,10 @@ def baron_load(root_dir, latent_dim=None):
             'y_train': hy_train,
             'X_test': hX_test,
             'y_test': hy_test,
+            'id_source' : source_columns,
+            'id_target' : target_columns,
+            'fi_source' : None,
+            'fi_target' : None,
         }
 
         return dataset, common_set

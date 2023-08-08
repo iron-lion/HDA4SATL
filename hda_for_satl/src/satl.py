@@ -115,6 +115,21 @@ class SATL:
         results.to_csv(self.path_out + mode + "_alphas.csv")
         return
 
+
+    def simple_feature_analysis(self, model, out_dir):
+        source_fi = model.P_source.T @ self.data_loader['fi_source']
+        source_fi = pd.DataFrame(source_fi)
+        source_fi.columns = self.data_loader['id_source']
+        source_fi = source_fi.T
+        source_fi.to_csv(f'./results/{out_dir}_source_importance.csv', sep=',')
+
+        target_fi = model.P_target.T @ self.data_loader['fi_target']
+        target_fi = pd.DataFrame(target_fi)
+        target_fi.columns = self.data_loader['id_target']
+        target_fi = target_fi.T
+        target_fi.to_csv(f'./results/{out_dir}_target_importance.csv', sep=',')
+
+
     def run_desc(self, missing_start, missing_end, mode):
         """
         Runs the model with an increasing share of masked cells (missing classes).
@@ -254,6 +269,7 @@ class SATL:
         z_source = model.transform_source()
         z_target = model.transform_target(X_test.T)
         plot_latent(z_source, y_source, z_target, y_test, pred, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}.png')
+        self.simple_feature_analysis(model, f'{self.path_out}_{"-".join([str(x) for x in comb])}')
         logger.info(f'...{comb} Fit done')
 
         if pseudo:
@@ -263,11 +279,10 @@ class SATL:
             z_source = model.transform_source()
             z_target = model.transform_target(X_test.T)
             plot_latent(z_source, y_source, z_target, y_test, pred_semi, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}_pseudo.png')
+            self.simple_feature_analysis(model, f'{self.path_out}_{"-".join([str(x) for x in comb])}')
             logger.info(f'...{comb} Fit_pseudo done')
         else:
             pred_semi = -1
-
-
 
         n_test = len(y_test)
         results_dict = dict()

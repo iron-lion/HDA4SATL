@@ -8,8 +8,6 @@ from datetime import datetime
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 import mnnpy
-import torch.nn as nn
-import torch
 from src.satl import *
 from src.data_loader import *
 from src.utils import *
