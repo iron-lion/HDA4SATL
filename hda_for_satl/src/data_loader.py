@@ -317,7 +317,15 @@ def baron_load(root_dir, latent_dim=None):
 
     if latent_dim is not None:
         target = latent_dim.fit_transform(target)
+        target_fi = latent_dim.components_
         source = latent_dim.fit_transform(source)
+        source_fi = latent_dim.components_
+    else:
+        target = np.array(target)
+        source = np.array(source)
+        target_fi = None
+        source_fi = None
+
 
     SKF = StratifiedKFold(n_splits=5).split(target, target_labels)
     for train_index, test_index in SKF:
@@ -333,8 +341,8 @@ def baron_load(root_dir, latent_dim=None):
             'y_test': hy_test,
             'id_source' : source_columns,
             'id_target' : target_columns,
-            'fi_source' : None,
-            'fi_target' : None,
+            'fi_source' : source_fi,
+            'fi_target' : target_fi,
         }
 
         return dataset, common_set

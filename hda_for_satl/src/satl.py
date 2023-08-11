@@ -19,7 +19,8 @@ class SATL:
                  n_resample_source=300,
                  n_resample_target=300,
                  n_jobs=1,
-                 K=10
+                 K=10,
+                 feature_analysis=False
                  ):
         """
         Constructor
@@ -42,6 +43,7 @@ class SATL:
         self.n_target = n_resample_target
         self.n_jobs = n_jobs
         self.k = K
+        self.feature_analysis = feature_analysis
 
     def test_alpha(self, comb, alpha, mode):
         """
@@ -117,8 +119,13 @@ class SATL:
 
 
     def simple_feature_analysis(self, model, out_dir):
+        if self.feature_analysis == False:
+            return
+        print(model.P_source.T.shape)
+        print(self.data_loader['fi_source'].shape)
         source_fi = model.P_source.T @ self.data_loader['fi_source']
         source_fi = pd.DataFrame(source_fi)
+        print(source_fi.shape)
         source_fi.columns = self.data_loader['id_source']
         source_fi = source_fi.T
         source_fi.to_csv(f'./results/{out_dir}_source_importance.csv', sep=',')

@@ -28,7 +28,7 @@ def main(n_jobs:int, scenario:dict):
         logging.info(f'{path}')
         return
 
-    root_dir = './dataset/'
+    root_dir = './dataset/baron_norm/'
     latent_space = PCA(n_components=pca_dim)
     dataset, label_set = baron_load(root_dir, latent_space)
     

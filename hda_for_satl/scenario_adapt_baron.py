@@ -126,34 +126,34 @@ if __name__ == '__main__':
 
 
     scenarios = []
-    scenarios.append({  'name_model': 'TransferTree', 'model': None,
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'TransferForest', 'model': None,
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'LDM', 'model': LDM(RidgeClassifier()),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'PRED', 'model': PRED(RidgeClassifier(0.), pretrain=True, random_state=0),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'CORAL', 'model': CORAL(RidgeClassifier(), random_state=0),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'SA', 'model': SA(RidgeClassifier()),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'FA', 'model': FA(RidgeClassifier()),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'TrAdaBoost', 'model': TrAdaBoost(RidgeClassifier(), n_estimators=10),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'BW', 'model': BW(RidgeClassifier(), gamma=0.5),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'NNW', 'model': NNW(RidgeClassifier(), n_neighbors=5),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'KMM', 'model': KMM(RidgeClassifier(), kernel="rbf", gamma=1.),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'fMMD', 'model': fMMD(RidgeClassifier(), kernel="linear"),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
-    scenarios.append({  'name_model': 'IWC', 'model': IWC(RidgeClassifier(0.), classifier=RidgeClassifier(0.), random_state=0),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
     scenarios.append({  'name_model': 'TCA', 'model': TCA(RidgeClassifier(), n_components = 10, mu=1, kernel="rbf", gamma=0.1, verbose=0, random_state=0),
-                        'seed': 37, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'TransferTree', 'model': None,
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'TransferForest', 'model': None,
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'LDM', 'model': LDM(RidgeClassifier()),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'PRED', 'model': PRED(RidgeClassifier(0.), pretrain=True, random_state=0),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'CORAL', 'model': CORAL(RidgeClassifier(), random_state=0),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'SA', 'model': SA(RidgeClassifier()),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'FA', 'model': FA(RidgeClassifier()),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'TrAdaBoost', 'model': TrAdaBoost(RidgeClassifier(), n_estimators=10),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'BW', 'model': BW(RidgeClassifier(), gamma=0.5),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'NNW', 'model': NNW(RidgeClassifier(), n_neighbors=5),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'KMM', 'model': KMM(RidgeClassifier(), kernel="rbf", gamma=1.),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'fMMD', 'model': fMMD(RidgeClassifier(), kernel="linear"),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
+    scenarios.append({  'name_model': 'IWC', 'model': IWC(RidgeClassifier(0.), classifier=RidgeClassifier(0.), random_state=0),
+                        'seed': 7, 'thisK': 10, 'oversample': 300, 'ndim': 11, 'num_to_del': 2, 'pca_dim': 50})
 
     for scenario in scenarios:
         main(num_cores, scenario)

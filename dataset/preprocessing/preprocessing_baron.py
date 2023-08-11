@@ -12,10 +12,10 @@ from utils import h5_data_loader
 import anndata as ad
 import scanpy as sc
 
-def main(seed, num_to_del, pca_dim):
+def main():
     label_filter = None
-    human_data, human_labels, _, _ = h5_data_loader(["./dataset/baron_sc.h5"], label_filter)
-    mouse_data, mouse_labels, _, _ = h5_data_loader(["./dataset/baron_mouse_sc.h5"], label_filter)
+    human_data, human_labels, _, _ = h5_data_loader(["./dataset/baron/baron_sc.h5"], label_filter)
+    mouse_data, mouse_labels, _, _ = h5_data_loader(["./dataset/baron/baron_mouse_sc.h5"], label_filter)
     print('rawpca')
     print('m', mouse_data.shape)
     print('h', human_data.shape)
@@ -49,8 +49,8 @@ def main(seed, num_to_del, pca_dim):
     final_data = pd.DataFrame(adata.X, columns=adata.var_names)
     final_label = pd.DataFrame(adata.obs["label"])
     final_data = final_data.T
-    final_data.to_csv(f'norm_human.csv')
-    final_label.to_csv(f'norm_human_label.csv')
+    final_data.to_csv(f'./dataset/baron_norm/norm_human.csv')
+    final_label.to_csv(f'./dataset/baron_norm/norm_human_label.csv')
     print(final_data)
 
     adata = ad.AnnData(mouse_data, dtype=np.int32)
@@ -67,12 +67,12 @@ def main(seed, num_to_del, pca_dim):
     final_data = pd.DataFrame(adata.X, columns=adata.var_names)
     final_label = pd.DataFrame(adata.obs["label"])
     final_data = final_data.T
-    final_data.to_csv(f'norm_mouse.csv')
-    final_label.to_csv(f'norm_mouse_label.csv')
+    final_data.to_csv(f'./dataset/baron_norm/norm_mouse.csv')
+    final_label.to_csv(f'./dataset/baron_norm/norm_mouse_label.csv')
     print(final_data)
     exit()
 
 
 
 if __name__ == '__main__':
-    main(1, 2, 50)
+    main()
