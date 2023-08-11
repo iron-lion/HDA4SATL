@@ -4,7 +4,7 @@ Analysis code for 'Species-Agnostic Transfer Learning for Cross-species Transcri
 This repository is a work in progress.
 
 ## Reproducibility
-Main analysis code is stored in a folder named 'hdafor_satl' with a specific header, 'scenario_'.
+Main analysis code is stored in a folder named 'hda_for_satl/' with a header, 'scenario_'.
 
 You can find part of results here [Master thesis work](https://github.com/nmuttray/het_GZSDA/tree/main).
 
