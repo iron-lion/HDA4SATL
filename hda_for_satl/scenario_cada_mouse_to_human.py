@@ -12,7 +12,7 @@ from src.satl import *
 
 
 def main(seed, args):
-    root_dir = "./dataset/datasets/"
+    root_dir = "./dataset/"
     organ = 'bm'
     prep = 'scanpy'
     dataset = preset_mousehuman_load(root_dir,  organ, prep)

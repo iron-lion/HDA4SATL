@@ -27,22 +27,23 @@ def main(n_jobs:int, scenario:dict):
 
     random.seed(seed)
 
-    root_dir = './dataset/norm_pca50/norm_pca50_'
+    #root_dir = './dataset/norm_pca50/norm_pca50_'
+    root_dir = './dataset/lps_norm/norm_'
 
-    out_dir = f'./results/satl_lps_pca_50/lps_stim_{source_species}-{target_species}_pca_{pca_dim}_numdel_{num_to_del}_seed_{seed}'
+    out_dir = f'test_satl_lps_pca_50/lps_stim_{source_species}-{target_species}_pca_{pca_dim}_numdel_{num_to_del}_seed_{seed}'
     if os.path.exists(out_dir + '_pred.csv'):
         logging.info(f'Skip: {out_dir}_pred.csv')
         return
     else:
         logging.info(f'Run:  {out_dir}_pred.csv')
 
-    latent_space = None# PCA(n_components=pca_dim)
+    latent_space = PCA(n_components=pca_dim)
     dataset = lps_stimulate_load(str(root_dir), str(source_species), str(target_species), latent_space)
     
     run_all = SATL(dataset,
             out_dir,
             num_to_del, dim=ndim, alpha=[0.01, 0.1, 1, 10, 100],
-            n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK)
+            n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK, feature_analysis=True)
     run_all.run_mode(False)
 
     del(run_all)
@@ -67,7 +68,8 @@ if __name__ == '__main__':
 
 
     scenarios = []
-    for pair in list(itertools.permutations(['mouse','pig','rat','rabbit'], 2)):
+    #for pair in list(itertools.permutations(['mouse','pig','rat','rabbit'], 2)):
+    for pair in list(itertools.permutations(['pig','rabbit'], 2)):
         for idx in list(itertools.product([1,2,3], repeat=2)):
             source_species = pair[0]+str(idx[0])
             target_species = pair[1]+str(idx[1])
