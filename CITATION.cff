@@ -6,11 +6,11 @@ authors:
   orcid: "https://orcid.org/0000-0002-9963-7014"
 - family-names: "Muttray"
   given-names: "Nils Paul"
-  orcid: "https://orcid.org/0000-0000-0000-0000"
 - family-names: "Hauschild "
   given-names: "Anne-Christin"
   orcid: "https://orcid.org/0000-0002-7499-4373"
 title: "HDA4SATL"
 version: 0.1.0
+doi: 10.5281/zenodo.8316106
 date-released: 2023-09-04
 url: "https://github.com/iron-lion/HDA4SATL"
