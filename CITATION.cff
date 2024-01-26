@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Park"
+  given-names: "Youngjun"
+  orcid: "https://orcid.org/0000-0002-9963-7014"
+- family-names: "Muttray"
+  given-names: "Nils Paul"
+- family-names: "Hauschild "
+  given-names: "Anne-Christin"
+  orcid: "https://orcid.org/0000-0002-7499-4373"
+title: "HDA4SATL"
+version: 0.1.0
+doi: 10.5281/zenodo.8316106
+date-released: 2023-09-04
+url: "https://github.com/iron-lion/HDA4SATL"
