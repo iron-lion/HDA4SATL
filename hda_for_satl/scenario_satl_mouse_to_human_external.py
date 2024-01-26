@@ -22,7 +22,7 @@ def main(n_jobs:int, scenario:dict):
 
     random.seed(seed)
     
-    out_dir = f'./INDIVI_seurat_xin_satl_mouse-human_pca_{pca_dim}_numdel_{num_to_del}_seed_{seed}.json'
+    out_dir = f'./INDIVI_seurat_muraro_satl_mouse-human_pca_{pca_dim}_numdel_{num_to_del}_seed_{seed}.json'
     if os.path.exists(out_dir):
         logging.info(f'{out_dir}')
         return
