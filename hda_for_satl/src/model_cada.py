@@ -13,7 +13,7 @@ from sklearn.metrics.cluster import adjusted_rand_score
 from src.utils import split_masked_cells
 import src.final_classifier as  classifier
 import src.model_block as bmodel
-
+import matplotlib.pyplot as plt
 
 class LINEAR_LOGSOFTMAX(nn.Module):
     """
@@ -58,27 +58,34 @@ class CAE(nn.Module):
         self.bn = bn
         self.relu = relu
 
-        self.weight_recon = 0.0001
-        self.weight_kld = 0.0
-        self.weight_dist = 1.0
+        self.beta = params['beta']
+        self.cross_recon = params['cross_recon']
+        self.dist = params['dist']
 
-        self.device = params.device
+        self.weight_recon = self.cross_recon['weight']
+        self.weight_kld = self.beta['weight']
+        self.weight_dist = self.dist['weight']
+
+        self.device = params['device']
         self.current_epoch = 0
-        self.epochs = params.epochs
-        self.lr = params.learning_rate
-        self.lrS = params.lr_scheduler_step
-        self.lrG = params.lr_scheduler_gamma
-        self.batch_size = params.batch_size
+        self.epochs = params['epochs']
+        self.lr = params['learning_rate']
+        self.lrS = params['lr_scheduler_step']
+        self.lrG = params['lr_scheduler_gamma']
+        self.batch_size = params['batch_size']
 
         self.optim_init = False
- 
+        self.log_loss = []
+        self.log_acc_known = []
+        self.log_acc_unknown = []
+
     def weight_step(self):
         """
         Updates the weight values used in the loss function based on the current epoch.
         """
-        self.weight_kld = min(0.25, max(0, self.current_epoch - 6) * 0.003)
-        self.weight_dist = 8.13
-        self.weight_recon = min(2.37, max(0, self.current_epoch - 21) * 0.05)
+        self.weight_kld = min(self.beta['weight'], max(0, (self.current_epoch - self.beta['start'])/(self.beta['end'] - self.beta['start']) * self.beta['weight']))
+        self.weight_dist = min(self.dist['weight'], max(0, (self.current_epoch - self.dist['start'])/(self.dist['end'] - self.dist['start']) * self.dist['weight']))
+        self.weight_recon = min(self.cross_recon['weight'], max(0, (self.current_epoch - self.cross_recon['start'])/(self.cross_recon['end'] - self.cross_recon['start']) * self.cross_recon['weight']))
 
 
     def init_model(self):
@@ -227,24 +234,9 @@ class CAE(nn.Module):
 
         cr1 = self.feature_decoder1(z2)
         cr2 = self.feature_decoder2(z1)
-        #mask = torch.Tensor([1.0 if lab1[i] == lab2[i] else 0.0 for i in range(len(lab1))])
-        #cr1 = torch.matmul(mask, cr1)
-        #cr2 = torch.matmul(mask, cr2)
-        #v1 = torch.matmul(mask, v_exp1)
-        #v2 = torch.matmul(mask, v_exp2)
         loss_cross_reconst = mse(cr1, v_exp1) + mse(cr2, v_exp2)
 
 
-        #label = [1 if lab1[i] == lab2[i] else 0 for i in range(len(lab1)) ]
-        distance = torch.sqrt(torch.sum((mu_exp1 - mu_exp2) ** 2, dim=1) + \
-                           torch.sum((torch.sqrt(logvar_exp1.exp()) - torch.sqrt(logvar_exp2.exp()))**2, \
-                        dim = 1))
-        distance = distance.sum()
-
-        #dist = []
-        #for i in range(len(label)):
-        #    dist.append(label[i] * distance[i])
-        #distance = sum(dist)/(sum(label)+1e6)
         """
 
         label = [0 if lab1[i] == lab2[i] else 1 for i in range(len(lab1)) ]
@@ -262,13 +254,26 @@ class CAE(nn.Module):
         KLD_exp2 = (0.5 * torch.sum(1 + logvar_exp2 - mu_exp2.pow(2) - logvar_exp2.exp()))
         KLD = KLD_exp1 + KLD_exp2
 
+        #label = [1 if lab1[i] == lab2[i] else 0 for i in range(len(lab1)) ]
+        distance = torch.sqrt(torch.sum((mu_exp1 - mu_exp2) ** 2, dim=1) + \
+                           torch.sum((torch.sqrt(logvar_exp1.exp()) - torch.sqrt(logvar_exp2.exp()))**2, \
+                        dim = 1))
+        distance = distance.sum()
+
+        #dist = []
+        #for i in range(len(label)):
+        #    dist.append(label[i] * distance[i])
+        #distance = sum(dist)/(sum(label)+1e6)
+
+
         self.weight_step()
         loss = loss_reconst - self.weight_kld * KLD
         if loss_cross_reconst > 0:
             loss += self.weight_recon * loss_cross_reconst
         if distance > 0:
             loss += self.weight_dist * distance
-        #print(loss_reconst.data, loss_cross_reconst.data, KLD.data, distance.data)
+        #print(loss.data, loss_reconst.data, loss_cross_reconst.data, KLD.data, distance.data)
+
         return loss
 
 
@@ -290,15 +295,15 @@ class CAE(nn.Module):
         feature_encoder_optim1, feature_decoder_optim1, feature_encoder_scheduler1, feature_decoder_scheduler1,\
         feature_encoder_optim2, feature_decoder_optim2, feature_encoder_scheduler2, feature_decoder_scheduler2 \
                 = self.init_optim()
- 
-        loss = self.recon_loss(exp1, exp2, lab1, lab2)
-        
+
         # training
         self.feature_encoder1.zero_grad()
         self.feature_decoder1.zero_grad()
         self.feature_encoder2.zero_grad()
         self.feature_decoder2.zero_grad()
-         
+ 
+        loss = self.recon_loss(exp1, exp2, lab1, lab2)
+               
         loss.backward()
         
         feature_encoder_optim1.step()
@@ -333,18 +338,25 @@ class CAE(nn.Module):
             self.current_epoch = epoch
 
             i=-1
-            for iters in range(0, data_loader.ntrain, self.batch_size):
+            epoch_loss = 0
+            for iters in range(0, data_loader.batch_length, self.batch_size):
                 i+=1
 
                 target, source, target_label, source_label = data_loader.next_batch(self.batch_size)
                 loss = self.train_step(target, source, target_label, source_label)
 
-                if i%10==0:
-                    print(f'epoch {epoch} - iter {i}, loss {str(loss)[:5]}')
+                #if i%10==0:
+                    #print(f'epoch {epoch} - iter {i}, loss {str(loss)[:5]}')
 
-                if i%10==0 and i>0:
-                    losses.append(loss)
-
+                #if i%10==0 and i>0:
+                epoch_loss =+ loss
+            
+            self.log_loss.append(epoch_loss/data_loader.ntrain)
+            interval = 20
+            if epoch%interval == 0:
+                _, acc_known, acc_unknown = self.train_classifier()       
+                self.log_acc_known += [acc_known.detach().cpu()]*interval
+                self.log_acc_unknown += [acc_unknown.detach().cpu()]*interval
         # turn into evaluation mode:
         #for key, value in self.encoder.items():
         #    self.encoder[key].eval()
@@ -361,48 +373,64 @@ class CAE(nn.Module):
         Returns:
             tuple: Tuple containing the best accuracy for known classes, best accuracy for unknown classes, and best harmonic mean
         """
-        m1, v1 = self.encode1(torch.Tensor(self.data_loader.X_seen).float())
-        z_seen = self.reparameterize(True, m1, v1).detach().numpy()
 
-        m2, v2 = self.encode2(torch.Tensor(self.data_loader.X_source).float())
-        z_source = self.reparameterize(True, m2, v2).detach().numpy()
+        with torch.no_grad():
+            ### Prep test set
+            X_test_seen, X_test_unseen, y_test_seen, y_test_unseen = split_masked_cells(self.data_loader.X_test, self.data_loader.y_test, masked_cells=self.data_loader.remove_col)
+            v_x_test_seen = Variable(torch.tensor(X_test_seen).float()).to(self.device)
+            v_x_test_unseen = Variable(torch.tensor(X_test_unseen).float()).to(self.device)         
 
-        lr_cls = 0.001
+            mt1, vt1 = self.encode1(v_x_test_seen)
+            test_seen_X = self.reparameterize(False, mt1, vt1)
+            test_seen_Y = y_test_seen
+            test_seen_Y = torch.from_numpy(test_seen_Y).to(self.device)
+
+            mt2, vt2 = self.encode1(v_x_test_unseen)
+            test_novel_X = self.reparameterize(False, mt2, vt2)
+            test_novel_Y = y_test_unseen
+            test_novel_Y = torch.from_numpy(test_novel_Y).to(self.device)
+
+            v_x_seen = Variable(torch.tensor(self.data_loader.X_seen).float()).to(self.device)
+            v_x_source = Variable(torch.tensor(self.data_loader.X_source).float()).to(self.device)
+
+            m1, v1 = self.encode1(v_x_seen)
+            z_seen = self.reparameterize(True, m1, v1)#.detach().numpy()
+
+            m2, v2 = self.encode2(v_x_source)
+            z_source = self.reparameterize(True, m2, v2)#.detach().numpy()
+
+            train_Z = [z_source, z_seen]
+            y_source = torch.from_numpy(self.data_loader.y_source).to(self.device)
+            y_seen = torch.from_numpy(self.data_loader.y_seen).to(self.device)
+            train_L = [y_source, y_seen]
+
+            # empty tensors are sorted out
+            train_X = [train_Z[i] for i in range(len(train_Z))]# if train_Z[i].size(0) != 0]
+            train_Y = [train_L[i] for i in range(len(train_L))]# if train_Z[i].size(0) != 0]
+
+            train_X = torch.concat(train_X, dim=0)
+            train_Y = torch.concat(train_Y, dim=0)
+
+            #print(set(test_novel_Y))
+            #print(set(train_Y))
+            cls_seenclasses = np.array((list(set(self.data_loader.y_source) - set(self.data_loader.remove_col))))
+            cls_seenclasses = torch.from_numpy(cls_seenclasses).to(self.device)
+            cls_novelclasses = np.array(self.data_loader.remove_col)
+            cls_novelclasses = torch.from_numpy(cls_novelclasses).to(self.device)
+
+        lr_cls = 0.01
         classifier_batch_size = 32
         num_classes = 11
+        clf = LINEAR_LOGSOFTMAX(11, num_classes).to(self.device) # latent_size
 
-        train_X = [torch.from_numpy(z_source).float(), torch.from_numpy(z_seen).float()]
-        train_Y = [torch.from_numpy(self.data_loader.y_source).float(), torch.from_numpy(self.data_loader.y_seen).float()]
-        train_X = torch.cat(train_X, dim=0)
-        train_Y = torch.cat(train_Y, dim=0)
-
-        X_test_seen, X_test_unseen, y_test_seen, y_test_unseen = split_masked_cells(self.data_loader.X_test, self.data_loader.y_test, masked_cells=self.data_loader.remove_col)
-        
-        mt1, vt1 = self.encode1(torch.Tensor(X_test_seen).float())
-        test_seen_X = self.reparameterize(True, mt1, vt1)#.detach().numpy()
-        #test_seen_X = torch.from_numpy(test_seen_X).float()
-        test_seen_Y = y_test_seen
-        test_seen_Y = torch.from_numpy(test_seen_Y).float()
-
-        mt2, vt2 = self.encode1(torch.Tensor(X_test_unseen).float())
-        test_novel_X = self.reparameterize(True, mt2, vt2)#.detach().numpy()
-        #test_novel_X = torch.from_numpy(test_novel_X).float()
-        test_novel_Y = y_test_unseen
-        test_novel_Y = torch.from_numpy(test_novel_Y).float()
-        cls_seenclasses = np.array((list(set(self.data_loader.y_source) - set(self.data_loader.remove_col))))
-        cls_seenclasses = torch.from_numpy(cls_seenclasses).float()
-        cls_novelclasses = np.array(self.data_loader.remove_col)
-        cls_novelclasses = torch.from_numpy(cls_novelclasses).float()
-
-        clf = LINEAR_LOGSOFTMAX(50, num_classes)
         cls = classifier.CLASSIFIER(clf, train_X, train_Y,
                                         test_seen_X, test_seen_Y,
                                         test_novel_X, test_novel_Y,
                                         cls_seenclasses, cls_novelclasses,
-                                        num_classes, 'cpu', lr_cls, 0.5, 1,
+                                        num_classes, self.device, lr_cls, 0.5, 1,
                                         classifier_batch_size,
                                         True)
-
+        #print(cls.H)
         best_acc_known, best_acc_unknown, best_h = -1, -1, -1
         for k in range(20):
             acc_known, acc_unknown, h = cls.fit()
@@ -410,4 +438,28 @@ class CAE(nn.Module):
             best_acc_unknown = acc_unknown if acc_unknown > best_acc_unknown else best_acc_unknown
             best_h = h if h > best_h else best_h
 
-        return best_h, best_acc_known, best_acc_unknown
+        return best_h.detach().cpu(), best_acc_known.detach().cpu(), best_acc_unknown.detach().cpu()
+
+    def plot_loss(self, filename):
+
+        fig, ax1 = plt.subplots()
+
+        color = 'tab:red'
+        ax1.set_xlabel('epochs')
+        ax1.set_ylabel('loss', color=color)
+        ax1.plot(self.log_loss, label='loss', color=color)
+        ax1.tick_params(axis='y', labelcolor=color)
+
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+
+        color = 'tab:blue'
+        ax2.set_ylabel('Acc', color=color)  # we already handled the x-label with ax1
+        ax2.plot(self.log_acc_known, label='S', color=color)
+        ax2.plot(self.log_acc_unknown, label='U', color='tab:green')
+        ax2.tick_params(axis='y', labelcolor=color)
+
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
+
+        plt.legend(loc='lower left', bbox_to_anchor=(1, 0.01))
+        plt.savefig(filename)
+        plt.clf()

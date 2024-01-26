@@ -187,6 +187,67 @@ class SATL:
             scores = get_all_for_desc(results, combs, True, self.path_out + str(j) + "_" + mode + "_h.csv")
         return
 
+
+    def run_mode_indiv(self, pseudo=True):
+        """
+        Runs all combinations of masked cells and preprocessing methods.
+
+        Args:
+            pseudo (bool): Flag indicating whether to use pseudo-labeling (default: True)
+
+        Returns:
+            None. The results are saved to a CSV file.
+        """
+        X_source = self.data_loader['X_source']
+        y_source = self.data_loader['y_source']
+
+        X_train = self.data_loader['X_train']
+        y_train = self.data_loader['y_train']
+
+        X_test = self.data_loader['X_test']
+        y_test = self.data_loader['y_test']
+
+        X_ind_test = self.data_loader['X_ind_test']
+        y_ind_test = self.data_loader['y_ind_test']
+
+        # Up/Down sampling for balancing the datasets
+        if self.n_source > 0:
+            X_source, y_source = balance_sampling(X_source, y_source, self.n_source)
+        if self.n_target > 0:
+            X_train, y_train = balance_sampling(X_train, y_train, self.n_target)
+
+        # Extract possible combinations of masked cells
+        unique_classes = set(y_ind_test)
+        combs = list(combinations(unique_classes, self.n_missing))
+
+        # Prepare DataFrame to store the results
+        cols = []
+        for i in range(self.n_missing):
+            cols.append("Missing " + str(i + 1))
+        cols = cols + ["alpha", "y_true", "y_pred", "y_pred_semi"]
+        results = pd.DataFrame(columns=cols)
+
+        # Each combination is run on a different core (parallel processing)
+        arguments = [(X_source, X_train, X_test, y_source, y_train, y_test, X_ind_test, y_ind_test, list(i), cols, pseudo) for i in combs]
+        all_results = []
+
+        if self.n_jobs > 1:
+            with mp.Pool(processes=self.n_jobs) as pool:
+                for result in pool.starmap(self.run_combination_ind, arguments):
+                    all_results.append(result)
+        else:
+            for args in arguments:
+                x = (self.run_combination_ind(*args))
+                all_results.append(x)
+
+        for result in all_results:
+            results = pd.concat((results, result), ignore_index=True)
+        results.to_csv('./results/' + self.path_out + "_pred.csv")
+        scores = get_all(results, True, './results/' + self.path_out + "_h.csv")
+        return
+
+
+
     def run_mode(self, pseudo=True):
         """
         Runs all combinations of masked cells and preprocessing methods.
@@ -241,6 +302,67 @@ class SATL:
         results.to_csv('./results/' + self.path_out + "_pred.csv")
         scores = get_all(results, True, './results/' + self.path_out + "_h.csv")
         return
+
+    def run_combination_ind(self, X_source, X_train, X_test, y_source, y_train, y_test, X_ind_test, y_ind_test, comb, cols, pseudo):
+        """
+        Runs one combination of masked cells (missing classes).
+
+        Args:
+            X_source (array-like): Source domain features
+            X_train (array-like): Target domain training features
+            X_test (array-like): Target domain test features
+            y_source (array-like): Source domain labels
+            y_train (array-like): Target domain training labels
+            y_test (array-like): Target domain test labels
+            comb (list): List of masked cells (missing classes)
+            cols (list): Column names of the final DataFrame
+            pseudo (bool): Flag indicating whether to use pseudo-labeling
+
+        Returns:
+            DataFrame: DataFrame with results
+        """
+        # Mask combinations to be tested
+        X_seen, X_unseen, y_seen, y_unseen = split_masked_cells(X_train, y_train, masked_cells=comb)
+        logger.info("Masked cells: " + str(comb))
+
+        # Cross-validate the regularization alpha
+        alpha = self.get_alpha(X_source, X_seen, y_source, y_seen) if len(self.alpha) > 1 else self.alpha
+        logger.info("Best alpha: " + str(alpha))
+
+        # Fit the model using the CDSPP algorithm (normal)
+        model = CDSPP(X_source.T, y_source, alpha, self.dim, list(comb))
+        model.fit(X_seen.T, y_seen)
+        pred = model.predict(X_ind_test.T)
+        
+        z_source = model.transform_source()
+        z_target = model.transform_target(X_ind_test.T)
+        plot_latent(z_source, y_source, z_target, y_ind_test, pred, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}.png')
+        self.simple_feature_analysis(model, f'{self.path_out}_{"-".join([str(x) for x in comb])}')
+        logger.info(f'...{comb} Fit done')
+
+        if pseudo:
+            # Fit the model using the semi-supervised CDSPP algorithm
+            model.fit_semi_supervised(X_seen.T, X_test.T, y_seen, K_seen=self.k, K_unseen=self.k)
+            pred_semi = model.predict(X_ind_test.T)
+            z_source = model.transform_source()
+            z_target = model.transform_target(X_ind_test.T)
+            plot_latent(z_source, y_source, z_target, y_ind_test, pred_semi, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}_pseudo.png')
+            self.simple_feature_analysis(model, f'{self.path_out}_{"-".join([str(x) for x in comb])}')
+            logger.info(f'...{comb} Fit_pseudo done')
+        else:
+            pred_semi = -1
+
+        n_test = len(y_ind_test)
+        results_dict = dict()
+        for i in range(len(cols) - 4):
+            results_dict[cols[i]] = n_test * [comb[i]]
+        results_dict["alpha"] = n_test * [alpha]
+        results_dict["y_true"] = y_ind_test
+        results_dict["y_pred"] = pred
+        results_dict["y_pred_semi"] = pred_semi
+        return pd.DataFrame.from_dict(results_dict)
+
+
 
     def run_combination(self, X_source, X_train, X_test, y_source, y_train, y_test, comb, cols, pseudo):
         """

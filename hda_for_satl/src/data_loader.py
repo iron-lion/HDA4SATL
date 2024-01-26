@@ -10,8 +10,9 @@ import gc
 import h5py
 from sklearn.model_selection import StratifiedKFold
 from sklearn import preprocessing
+from sklearn.utils import shuffle
 from src.utils import split_masked_cells
-
+from collections import Counter
 
 class GZSL_data_loader(object):
     def __init__(self, dataset, remove_col, device='cuda'):
@@ -45,8 +46,16 @@ class GZSL_data_loader(object):
 
         # Split the masked cells in the training data into seen and unseen classes
         self.X_seen, self.X_unseen, self.y_seen, self.y_unseen = split_masked_cells(self.X_train, self.y_train, masked_cells=remove_col)
-        self.ntrain = len(self.y_seen)
+        class_counts = Counter(self.y_seen)
+        self.ntrain = sum(class_counts.values())
         self.ntest = len(self.y_test)
+
+        self.current_batch = 0
+        self.batch_length = 0
+        self.btarget, self.bsource = [], []
+        self.btarget_label, self.bsource_label = [], []
+
+        self.next_batch(1)
 
     def next_batch(self, batch_size):
         """
@@ -63,29 +72,50 @@ class GZSL_data_loader(object):
                 - source_label: Source domain batch labels.
 
         """
-        target, source = [], []
-        target_label, source_label = [], []
-        for i in list(set(self.y_seen)):
-            target_index = np.in1d(self.y_seen, i, invert=False)
-            source_index = np.in1d(self.y_source, i, invert=False)
-            target_subset = self.X_seen[target_index, :]
-            source_subset = self.X_source[source_index, :]
-            target_label_subset = self.y_seen[target_index]
-            source_label_subset = self.y_source[source_index]
+        if (self.ntrain > 2):
+            while (batch_size > self.ntrain) :
+                if (batch_size == 2):
+                    break
+                batch_size = batch_size / 2
 
-            target_index = list(range(len(target_subset)))
-            source_index = list(range(len(source_subset)))
-            random.shuffle(target_index)
-            random.shuffle(source_index)
+        if (self.current_batch + batch_size) > self.batch_length:
+            self.current_batch = 0
+            target, source = [], []
+            target_label, source_label = [], []
+            for i in list(set(self.y_seen)):
+                target_index = np.in1d(self.y_seen, i, invert=False)
+                source_index = np.in1d(self.y_source, i, invert=False)
+                target_subset = self.X_seen[target_index, :]
+                source_subset = self.X_source[source_index, :]
+                target_label_subset = self.y_seen[target_index]
+                source_label_subset = self.y_source[source_index]
 
-            target_subset = target_subset[target_index[:5], :]
-            source_subset = source_subset[source_index[:5], :]
-            target.append(target_subset)
-            source.append(source_subset)
-            target_label.append(target_label_subset[target_index[:5]])
-            source_label.append(source_label_subset[source_index[:5]])
+                target_index = list(range(len(target_subset)))
+                source_index = list(range(len(source_subset)))
+                random.shuffle(target_index)
+                random.shuffle(source_index)
 
-        target, source, target_label, source_label = map(np.concatenate, [target, source, target_label, source_label])
+                _min_len = min(len(target_index), len(source_index))
+                target_subset = target_subset[target_index[:_min_len], :]
+                source_subset = source_subset[source_index[:_min_len], :]
+                target.append(target_subset)
+                source.append(source_subset)
+                target_label.append(target_label_subset[target_index[:_min_len]])
+                source_label.append(source_label_subset[source_index[:_min_len]])
+            
+            target, source, target_label, source_label = shuffle(target, source, target_label, source_label, random_state = 0)
+            self.btarget, self.bsource = target, source
+            self.btarget_label, self.bsource_label = target_label, source_label
+            
+            self.batch_length = len(target_label)
+        
+        target, source, target_label, source_label \
+            = map(np.concatenate, [\
+              self.btarget[self.current_batch:self.current_batch+batch_size],\
+              self.bsource[self.current_batch:self.current_batch+batch_size],\
+              self.btarget_label[self.current_batch:self.current_batch+batch_size],\
+              self.bsource_label[self.current_batch:self.current_batch+batch_size]])
+        self.current_batch += batch_size
         return target, source, target_label, source_label
 
 
@@ -346,3 +376,144 @@ def baron_load(root_dir, latent_dim=None):
         }
 
         return dataset, common_set
+
+
+def df_total(x):    
+    np.nan_to_num(x,0)
+    x = (x.T/x.sum(axis=1)).T*10000
+    np.nan_to_num(x,0)
+    return x
+def df_log(x):
+    return np.log2(x+1.0)
+
+from sklearn.preprocessing import normalize as l2norm
+def df_l2norm(x):
+    x = l2norm(x, axis=1, copy=True)
+    return x
+
+def df_zscore(x):
+    x = ((x.transpose() - x.mean(1))/(x.std(1)))
+    x = x.transpose()
+    x = x.replace(np.nan,0)
+    return x
+
+
+def baron_external_load_total(root_dir, external, latent_dim=None):
+    """
+    Load the external dataset (only human pancreas).
+
+    This function loads the Baron dataset for cross-species analysis.
+
+    Args:
+        latent_dim (object, optional): Latent dimension object for transformation (default: None).
+
+    Returns:
+        tuple: A tuple containing the following elements:
+            - dataset: Loaded dataset.
+            - common_set: Set of common labels between source and target domains.
+
+    """
+    indivt = pd.read_csv(f'{root_dir}{external}.csv', index_col=0, header=0)
+    indivt_labels = pd.read_csv(f'{root_dir}{external}_label.csv', index_col=0, header=0)
+    target = pd.read_csv(f'{root_dir}norm_human.csv', index_col=0, header=0)
+    target_labels = pd.read_csv(f'{root_dir}norm_human_label.csv', index_col=0, header=0)
+    source = pd.read_csv(f'{root_dir}norm_mouse.csv', index_col=0, header=0)
+    source_labels = pd.read_csv(f'{root_dir}norm_mouse_label.csv', index_col=0, header=0)
+    indivt = indivt.T
+    target = target.T
+    source = source.T
+
+    indivit_columns = indivt.columns
+    target_columns = target.columns
+    source_columns = source.columns
+    human_common_genes = (indivt.columns).intersection(target.columns)
+    indivt = indivt.filter(human_common_genes)
+    target = target.filter(human_common_genes)
+
+    indivt = indivt.reindex(sorted(indivt.columns), axis=1)
+    target = target.reindex(sorted(target.columns), axis=1)
+
+    indivt = df_zscore(df_log(df_total(indivt)+1))
+    target = df_zscore(df_log(df_total(target)+1))
+    source = df_zscore(df_log(df_total(source)+1))
+
+
+    indivt_labels = indivt_labels.T.values.tolist()[0]
+    target_labels = target_labels.T.values.tolist()[0]
+    source_labels = source_labels.T.values.tolist()[0]
+    ##
+    common_set = set(target_labels) & set(source_labels)
+    all_set = set(target_labels) | set(source_labels)
+    out_set = all_set - common_set
+    le = preprocessing.LabelEncoder()
+    le.fit(list(common_set))
+
+    res = {}
+    for cl in le.classes_:
+        res.update({cl:le.transform([cl])[0]})
+    print(res)
+
+    indivt_labels = np.array(indivt_labels)
+    target_labels = np.array(target_labels)
+    source_labels = np.array(source_labels)
+    print(set(indivt_labels))
+    print(common_set)
+   
+    keep = np.in1d(indivt_labels, list(common_set), invert=False)
+    indivt = indivt.loc[keep, :]
+    indivt_labels = indivt_labels[keep]
+    del(keep)
+    keep = np.in1d(target_labels, list(common_set), invert=False)
+    target = target.loc[keep, :]
+    target_labels = target_labels[keep]
+    del(keep)
+    keep = np.in1d(source_labels, list(common_set), invert=False)
+    source = source.loc[keep, :]
+    source_labels = source_labels[keep]
+    del(keep)
+
+    common_set = le.transform(list(common_set))
+    ###
+
+    indivt_labels = np.array(le.transform(indivt_labels), dtype='int32')
+    target_labels = np.array(le.transform(target_labels), dtype='int32')
+    source_labels = np.array(le.transform(source_labels), dtype='int32')
+
+    if latent_dim is not None:
+        target = latent_dim.fit_transform(target)
+        target_fi = latent_dim.components_
+        indivt = latent_dim.transform(indivt)
+        indivt_fi = latent_dim.components_
+        source = latent_dim.fit_transform(source)
+        source_fi = latent_dim.components_
+    else:
+        indivt = np.array(indivt)
+        target = np.array(target)
+        source = np.array(source)
+        indivt_fi = None
+        target_fi = None
+        source_fi = None
+
+
+    SKF = StratifiedKFold(n_splits=5).split(target, target_labels)
+    for train_index, test_index in SKF:
+        hX_train, hX_test = target[train_index, :], target[test_index, :]
+        hy_train, hy_test = target_labels[train_index], target_labels[test_index]
+
+        dataset = {
+            'X_source': source,
+            'y_source': source_labels,
+            'X_train': hX_train,
+            'y_train': hy_train,
+            'X_test': hX_test,
+            'y_test': hy_test,
+            'id_source' : source_columns,
+            'id_target' : target_columns,
+            'fi_source' : source_fi,
+            'fi_target' : target_fi,
+            'X_ind_test' : indivt,
+            'y_ind_test' : indivt_labels,          
+        }
+
+        return dataset, common_set
+
