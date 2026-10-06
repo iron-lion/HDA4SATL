@@ -25,7 +25,7 @@ def main(n_jobs:int, scenario:dict):
     num_to_del = scenario['num_to_del']
     pca_dim = scenario['pca_dim']
 
-    random.seed(seed)
+    set_seed(seed)
 
     #root_dir = './dataset/norm_pca50/norm_pca50_'
     root_dir = './dataset/lps_norm/norm_'
@@ -37,13 +37,13 @@ def main(n_jobs:int, scenario:dict):
     else:
         logging.info(f'Run:  {out_dir}_pred.csv')
 
-    latent_space = PCA(n_components=pca_dim)
+    latent_space = PCA(n_components=pca_dim, random_state=seed)
     dataset = lps_stimulate_load(str(root_dir), str(source_species), str(target_species), latent_space)
     
     run_all = SATL(dataset,
             out_dir,
             num_to_del, dim=ndim, alpha=[0.01, 0.1, 1, 10, 100],
-            n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK, feature_analysis=True)
+            n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK, feature_analysis=True, seed=seed)
     run_all.run_mode(False)
 
     del(run_all)

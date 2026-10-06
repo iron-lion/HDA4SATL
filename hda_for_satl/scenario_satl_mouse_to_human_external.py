@@ -20,7 +20,7 @@ def main(n_jobs:int, scenario:dict):
     num_to_del = scenario['num_to_del']
     pca_dim = scenario['pca_dim']
 
-    random.seed(seed)
+    set_seed(seed)
     
     out_dir = f'./INDIVI_seurat_muraro_satl_mouse-human_pca_{pca_dim}_numdel_{num_to_del}_seed_{seed}.json'
     if os.path.exists(out_dir):
@@ -30,7 +30,7 @@ def main(n_jobs:int, scenario:dict):
     root_dir = './dataset/baron_norm/'
     external = 'norm_muraro'
 
-    latent_space = PCA(n_components=pca_dim)
+    latent_space = PCA(n_components=pca_dim, random_state=seed)
     dataset, label_set = baron_external_load_total(root_dir, external, latent_space)
     
     results = {
@@ -47,7 +47,7 @@ def main(n_jobs:int, scenario:dict):
                     2, 
                     dim=ndim, 
                     alpha=[0.01, 0.05, 0.1, 1, 10, 100],
-                    n_resample_source=oversample, n_resample_target=-1, n_jobs = n_jobs, K=thisK, feature_analysis=False)
+                    n_resample_source=oversample, n_resample_target=-1, n_jobs = n_jobs, K=thisK, feature_analysis=False, seed=seed)
     run_all.run_mode_indiv()
 
    

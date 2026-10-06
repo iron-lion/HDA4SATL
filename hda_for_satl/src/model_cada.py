@@ -91,16 +91,19 @@ class CAE(nn.Module):
     def init_model(self):
         """
         Initializes the model by creating the feature encoder and decoder layers.
+
+        Layers keep PyTorch's default initialisation. A custom `weights_init`
+        used to be called here, but it was a no-op: it was passed the container
+        modules rather than applied recursively, so no Linear layer ever matched
+        its branches. Its Linear branch also zeroed every weight (`normal_()`
+        immediately followed by `zero_()`), so wiring it up correctly would have
+        collapsed the network. Removed rather than repaired -- the default init
+        is what every published result was produced with.
         """
         self.feature_encoder1 = bmodel.VGEPEncoder(self.input_channel_len, self.embeding, self.latent, bn=self.bn, relu=self.relu).to(self.device)
         self.feature_decoder1 = bmodel.ADecoder(self.input_channel_len, self.decoding, self.latent, bn=self.bn, relu=self.relu).to(self.device)
         self.feature_encoder2 = bmodel.VGEPEncoder(self.output_channel_len, self.embeding, self.latent, bn=self.bn, relu=self.relu).to(self.device)
         self.feature_decoder2 = bmodel.ADecoder(self.output_channel_len, self.decoding, self.latent, bn=self.bn, relu=self.relu).to(self.device)
-
-        bmodel.weights_init(self.feature_encoder1)
-        bmodel.weights_init(self.feature_decoder1)
-        bmodel.weights_init(self.feature_encoder2)
-        bmodel.weights_init(self.feature_decoder2)
 
 
     def model_train(self):
@@ -349,7 +352,7 @@ class CAE(nn.Module):
                     #print(f'epoch {epoch} - iter {i}, loss {str(loss)[:5]}')
 
                 #if i%10==0 and i>0:
-                epoch_loss =+ loss
+                epoch_loss += loss
             
             self.log_loss.append(epoch_loss/data_loader.ntrain)
             interval = 20

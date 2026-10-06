@@ -21,7 +21,7 @@ def main(n_jobs:int, scenario:dict):
     num_to_del = scenario['num_to_del']
     pca_dim = scenario['pca_dim']
 
-    random.seed(seed)
+    set_seed(seed)
     
     path = f'./results/mnn_baron_norm/baron_mnn_mouse-human_pca_{pca_dim}_numdel_{num_to_del}_seed_{seed}.json'
     if os.path.exists(path):
@@ -29,7 +29,7 @@ def main(n_jobs:int, scenario:dict):
         return
 
     root_dir = './dataset/baron_norm/'
-    latent_space = PCA(n_components=pca_dim)
+    latent_space = PCA(n_components=pca_dim, random_state=seed)
     dataset, label_set = baron_load(root_dir, latent_space)
     
     results = {
@@ -51,7 +51,7 @@ def main(n_jobs:int, scenario:dict):
         mnn_X_seen = adata[len(dataset['X_source']): len(dataset['X_source'])+len(X_seen),:]
         mnn_hX_test = adata[len(dataset['X_source']) + len(X_seen):,:]
        
-        model = RandomForestClassifier().fit(mnn_mouse_data, dataset['y_source'])
+        model = RandomForestClassifier(random_state=seed).fit(mnn_mouse_data, dataset['y_source'])
         pred = model.predict(mnn_hX_test)
         h, acc_known, acc_unknown = h_score(dataset['y_test'], pred, remove_col)
         print(h, acc_known, acc_unknown)

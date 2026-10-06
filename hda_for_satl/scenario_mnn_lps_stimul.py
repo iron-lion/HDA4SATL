@@ -28,16 +28,16 @@ def main(n_jobs:int, scenario:dict):
     num_to_del = scenario['num_to_del']
     pca_dim = scenario['pca_dim']
 
-    random.seed(seed)
+    set_seed(seed)
 
     root_dir = './dataset/norm_'
     #latent_space = LPP(n_components=pca_dim)
-    latent_space = PCA(n_components=pca_dim)
+    latent_space = PCA(n_components=pca_dim, random_state=seed)
     dataset = lps_stimulate_load(str(root_dir), str(source_species), str(target_species), latent_space)
 
     path = f'./results/mnn_lps_pca_50/mnn_lps_norm_{source_species}-{target_species}_pca_{pca_dim}_numdel_{num_to_del}_seed_{seed}.json'
     if os.path.exists(path):
-        loggine.info(f'... result file exists ... {path}')
+        logging.info(f'... result file exists ... {path}')
         return
     logging.info(f'{path}')
 
@@ -60,7 +60,7 @@ def main(n_jobs:int, scenario:dict):
         mnn_X_seen = adata[len(dataset['X_source']): len(dataset['X_source'])+len(X_seen),:]
         mnn_hX_test = adata[len(dataset['X_source']) + len(X_seen):,:]
        
-        model = RandomForestClassifier().fit(mnn_source, dataset['y_source'])
+        model = RandomForestClassifier(random_state=seed).fit(mnn_source, dataset['y_source'])
         pred = model.predict(mnn_hX_test)
         h, acc_known, acc_unknown = h_score(dataset['y_test'], pred, remove_col)
 

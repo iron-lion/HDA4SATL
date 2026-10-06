@@ -19,7 +19,7 @@ def main(n_jobs:int, scenario:dict):
     oversample = scenario['oversample']
     ndim = scenario['ndim']
 
-    random.seed(seed)
+    set_seed(seed)
     root_dir = "./dataset/"
     dataset = preset_mousehuman_load(root_dir, organ, prep)
 
@@ -35,7 +35,7 @@ def main(n_jobs:int, scenario:dict):
                     2, 
                     dim=ndim, 
                     alpha=[0.01, 0.1, 1, 10, 100],
-                    n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK, feature_analysis=False)
+                    n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK, feature_analysis=False, seed=seed)
     run_all.run_mode()
 
 

@@ -20,7 +20,8 @@ class SATL:
                  n_resample_target=300,
                  n_jobs=1,
                  K=10,
-                 feature_analysis=False
+                 feature_analysis=False,
+                 seed=None
                  ):
         """
         Constructor
@@ -44,6 +45,7 @@ class SATL:
         self.n_jobs = n_jobs
         self.k = K
         self.feature_analysis = feature_analysis
+        self.seed = seed
 
     def test_alpha(self, comb, alpha, mode):
         """
@@ -57,6 +59,8 @@ class SATL:
         Returns:
             None. The results are saved to a CSV file.
         """
+        set_seed(self.seed)
+
         X_source = self.data_loader['X_source']
         y_source = self.data_loader['y_source']
 
@@ -67,8 +71,8 @@ class SATL:
         y_test = self.data_loader['y_test']
 
         # Up/Down sampling for balancing the datasets
-        X_source, y_source = balance_sampling(X_source, y_source, self.n_source)
-        X_train, y_train = balance_sampling(X_train, y_train, self.n_target)
+        X_source, y_source = balance_sampling(X_source, y_source, self.n_source, random_state=self.seed)
+        X_train, y_train = balance_sampling(X_train, y_train, self.n_target, random_state=self.seed)
 
         # Splitting the data into seen and unseen masked cells
         X_seen, X_unseen, y_seen, y_unseen = split_masked_cells(X_train, y_train, masked_cells=comb)
@@ -149,6 +153,8 @@ class SATL:
         Returns:
             None. The results are saved to CSV files.
         """
+        set_seed(self.seed)
+
         X_source = self.data_loader['X_source']
         y_source = self.data_loader['y_source']
 
@@ -159,8 +165,8 @@ class SATL:
         y_test = self.data_loader['y_test']
 
         # Up/Down sampling for balancing the datasets
-        X_source, y_source = balance_sampling(X_source, y_source, self.n_source)
-        X_train, y_train = balance_sampling(X_train, y_train, self.n_target)
+        X_source, y_source = balance_sampling(X_source, y_source, self.n_source, random_state=self.seed)
+        X_train, y_train = balance_sampling(X_train, y_train, self.n_target, random_state=self.seed)
 
         for j in range(missing_start, missing_end + 1):
             # Extract possible combinations of masked cells
@@ -198,6 +204,8 @@ class SATL:
         Returns:
             None. The results are saved to a CSV file.
         """
+        set_seed(self.seed)
+
         X_source = self.data_loader['X_source']
         y_source = self.data_loader['y_source']
 
@@ -212,9 +220,9 @@ class SATL:
 
         # Up/Down sampling for balancing the datasets
         if self.n_source > 0:
-            X_source, y_source = balance_sampling(X_source, y_source, self.n_source)
+            X_source, y_source = balance_sampling(X_source, y_source, self.n_source, random_state=self.seed)
         if self.n_target > 0:
-            X_train, y_train = balance_sampling(X_train, y_train, self.n_target)
+            X_train, y_train = balance_sampling(X_train, y_train, self.n_target, random_state=self.seed)
 
         # Extract possible combinations of masked cells
         unique_classes = set(y_ind_test)
@@ -258,6 +266,8 @@ class SATL:
         Returns:
             None. The results are saved to a CSV file.
         """
+        set_seed(self.seed)
+
         X_source = self.data_loader['X_source']
         y_source = self.data_loader['y_source']
 
@@ -269,9 +279,9 @@ class SATL:
 
         # Up/Down sampling for balancing the datasets
         if self.n_source > 0:
-            X_source, y_source = balance_sampling(X_source, y_source, self.n_source)
+            X_source, y_source = balance_sampling(X_source, y_source, self.n_source, random_state=self.seed)
         if self.n_target > 0:
-            X_train, y_train = balance_sampling(X_train, y_train, self.n_target)
+            X_train, y_train = balance_sampling(X_train, y_train, self.n_target, random_state=self.seed)
 
         # Extract possible combinations of masked cells
         unique_classes = set(y_source)
@@ -321,12 +331,18 @@ class SATL:
         Returns:
             DataFrame: DataFrame with results
         """
+        # Per-combination seed; see satl/satl.py for why a single global seed
+        # is not enough once combinations are farmed out to a worker pool.
+        comb_seed = derive_seed(self.seed, 'comb', *comb)
+        set_seed(comb_seed)
+
         # Mask combinations to be tested
         X_seen, X_unseen, y_seen, y_unseen = split_masked_cells(X_train, y_train, masked_cells=comb)
         logger.info("Masked cells: " + str(comb))
 
         # Cross-validate the regularization alpha
-        alpha = self.get_alpha(X_source, X_seen, y_source, y_seen) if len(self.alpha) > 1 else self.alpha
+        alpha = self.get_alpha(X_source, X_seen, y_source, y_seen,
+                               random_state=comb_seed) if len(self.alpha) > 1 else self.alpha
         logger.info("Best alpha: " + str(alpha))
 
         # Fit the model using the CDSPP algorithm (normal)
@@ -336,7 +352,8 @@ class SATL:
         
         z_source = model.transform_source()
         z_target = model.transform_target(X_ind_test.T)
-        plot_latent(z_source, y_source, z_target, y_ind_test, pred, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}.png')
+        plot_latent(z_source, y_source, z_target, y_ind_test, pred, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}.png',
+                    random_state=comb_seed)
         self.simple_feature_analysis(model, f'{self.path_out}_{"-".join([str(x) for x in comb])}')
         logger.info(f'...{comb} Fit done')
 
@@ -346,7 +363,8 @@ class SATL:
             pred_semi = model.predict(X_ind_test.T)
             z_source = model.transform_source()
             z_target = model.transform_target(X_ind_test.T)
-            plot_latent(z_source, y_source, z_target, y_ind_test, pred_semi, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}_pseudo.png')
+            plot_latent(z_source, y_source, z_target, y_ind_test, pred_semi, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}_pseudo.png',
+                        random_state=comb_seed)
             self.simple_feature_analysis(model, f'{self.path_out}_{"-".join([str(x) for x in comb])}')
             logger.info(f'...{comb} Fit_pseudo done')
         else:
@@ -382,12 +400,18 @@ class SATL:
         Returns:
             DataFrame: DataFrame with results
         """
+        # Per-combination seed; see satl/satl.py for why a single global seed
+        # is not enough once combinations are farmed out to a worker pool.
+        comb_seed = derive_seed(self.seed, 'comb', *comb)
+        set_seed(comb_seed)
+
         # Mask combinations to be tested
         X_seen, X_unseen, y_seen, y_unseen = split_masked_cells(X_train, y_train, masked_cells=comb)
         logger.info("Masked cells: " + str(comb))
 
         # Cross-validate the regularization alpha
-        alpha = self.get_alpha(X_source, X_seen, y_source, y_seen) if len(self.alpha) > 1 else self.alpha
+        alpha = self.get_alpha(X_source, X_seen, y_source, y_seen,
+                               random_state=comb_seed) if len(self.alpha) > 1 else self.alpha
         logger.info("Best alpha: " + str(alpha))
 
         # Fit the model using the CDSPP algorithm (normal)
@@ -397,7 +421,8 @@ class SATL:
         
         z_source = model.transform_source()
         z_target = model.transform_target(X_test.T)
-        plot_latent(z_source, y_source, z_target, y_test, pred, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}.png')
+        plot_latent(z_source, y_source, z_target, y_test, pred, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}.png',
+                    random_state=comb_seed)
         self.simple_feature_analysis(model, f'{self.path_out}_{"-".join([str(x) for x in comb])}')
         logger.info(f'...{comb} Fit done')
 
@@ -407,7 +432,8 @@ class SATL:
             pred_semi = model.predict(X_test.T)
             z_source = model.transform_source()
             z_target = model.transform_target(X_test.T)
-            plot_latent(z_source, y_source, z_target, y_test, pred_semi, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}_pseudo.png')
+            plot_latent(z_source, y_source, z_target, y_test, pred_semi, comb, f'{self.path_out}_{"-".join([str(x) for x in comb])}_pseudo.png',
+                        random_state=comb_seed)
             self.simple_feature_analysis(model, f'{self.path_out}_{"-".join([str(x) for x in comb])}')
             logger.info(f'...{comb} Fit_pseudo done')
         else:
@@ -423,7 +449,7 @@ class SATL:
         results_dict["y_pred_semi"] = pred_semi
         return pd.DataFrame.from_dict(results_dict)
 
-    def get_alpha(self, X_source, X, y_source, y):
+    def get_alpha(self, X_source, X, y_source, y, random_state=None):
         """
         Performs sample- and class-wise cross-validation to determine the best alpha value.
 
@@ -439,7 +465,7 @@ class SATL:
         overall_score = []
         for i in range(len(self.alpha)):
             score = []
-            for train_index, test_index in KFold(shuffle=True, n_splits=5).split(X):
+            for train_index, test_index in KFold(shuffle=True, n_splits=5, random_state=random_state).split(X):
                 X_train, X_test = X[train_index], X[test_index]
                 y_train, y_test = y[train_index], y[test_index]
                 for j in set(y):

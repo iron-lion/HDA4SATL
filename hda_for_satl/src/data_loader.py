@@ -76,7 +76,7 @@ class GZSL_data_loader(object):
             while (batch_size > self.ntrain) :
                 if (batch_size == 2):
                     break
-                batch_size = batch_size / 2
+                batch_size = batch_size // 2
 
         if (self.current_batch + batch_size) > self.batch_length:
             self.current_batch = 0

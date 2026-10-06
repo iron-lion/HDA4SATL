@@ -4,7 +4,9 @@ import anndata as ad
 import logging
 import os
 import json
+import random
 import sys
+import zlib
 import h5py
 import multiprocessing
 from sklearn.manifold import TSNE
@@ -17,6 +19,62 @@ from sklearn.metrics import balanced_accuracy_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import wilcoxon
+
+
+def set_seed(seed):
+    """
+    Seeds every global RNG this package draws from.
+
+    Covers `random` (data_loader.next_batch), `numpy.random` (SMOTE,
+    RandomUnderSampler, KFold, TSNE, randomized PCA) and `torch` (the CADA-VAE
+    reparameterisation and the final classifier's shuffling).
+
+    Note this is *not* sufficient on its own under multiprocessing: forked
+    workers inherit one RNG state and then advance it at different rates
+    depending on how many tasks each happens to receive, so a per-task seed
+    derived with `derive_seed` is what actually makes a parallel run
+    reproducible. See SATL.run_combination.
+
+    Args:
+        seed (int): The base seed. A value of None is a no-op, which leaves the
+                    global RNGs untouched (pre-existing behaviour).
+
+    Returns:
+        int | None: The seed that was applied.
+    """
+    if seed is None:
+        return None
+    random.seed(seed)
+    np.random.seed(seed % (2 ** 32))
+    try:
+        import torch
+    except ImportError:
+        pass
+    else:
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+    return seed
+
+
+def derive_seed(base_seed, *parts):
+    """
+    Deterministically derives a child seed from a base seed plus task identifiers.
+
+    Uses crc32 rather than hash(), because hash() is randomised per interpreter
+    for str inputs (PYTHONHASHSEED) and would not be stable across processes.
+
+    Args:
+        base_seed (int): The run's base seed.
+        *parts: Values identifying the task (e.g. the masked-class combination).
+
+    Returns:
+        int | None: A seed in [0, 2**31), or None if base_seed is None.
+    """
+    if base_seed is None:
+        return None
+    key = '|'.join(str(p) for p in (base_seed,) + parts).encode('utf-8')
+    return zlib.crc32(key) & 0x7FFFFFFF
 
 
 def create_logger(jobid, current_time):
@@ -71,7 +129,7 @@ def h_score(y_true, y_pred, masked_cells):
     return h, acc_known, acc_unknown
 
 
-def split_masked_cells(X_t, y_t, masked_cells, balance=False, n=500):
+def split_masked_cells(X_t, y_t, masked_cells, balance=False, n=500, random_state=None):
     """
     Masks cells for generalized zero-shot learning.
 
@@ -81,6 +139,7 @@ def split_masked_cells(X_t, y_t, masked_cells, balance=False, n=500):
 	masked_cells (list): A list of cells to be masked from the data.
 	balance (bool): Whether to balance seen train data.
 	n (int): The desired number of samples per class.
+	random_state (int): Seed used when balance=True.
 
     Returns:
 	X_t_seen (numpy.ndarray): The features of seen classes.
@@ -94,11 +153,11 @@ def split_masked_cells(X_t, y_t, masked_cells, balance=False, n=500):
     y_seen = y_t[keep]
     y_unseen = y_t[~keep]
     if balance:
-        X_t_seen, y_seen = balance_sampling(X_t_seen, y_seen, n)
+        X_t_seen, y_seen = balance_sampling(X_t_seen, y_seen, n, random_state=random_state)
     return X_t_seen, X_t_unseen, y_seen, y_unseen
 
 
-def balance_sampling(X, y, n=100):
+def balance_sampling(X, y, n=100, random_state=None):
     """
     Re-balances data by over-sampling with SMOTE and under-sampling randomly.
 
@@ -106,6 +165,8 @@ def balance_sampling(X, y, n=100):
 	X (numpy.ndarray): The feature matrix.
 	y (numpy.ndarray): The labels.
 	n (int): The desired samples per class.
+	random_state (int): Seed for SMOTE / RandomUnderSampler. None falls back
+	                    to the global numpy RNG (pre-existing behaviour).
 
     Returns:
 	X_combined_sampling (numpy.ndarray): The resampled feature matrix.
@@ -122,12 +183,12 @@ def balance_sampling(X, y, n=100):
             under = np.concatenate((under, np.array([i])))
     if len(over) == 0:
         dict_under = dict(zip(under, [n for i in range(len(under))]))
-        under_sam =  RandomUnderSampler(sampling_strategy=dict_under)
+        under_sam =  RandomUnderSampler(sampling_strategy=dict_under, random_state=random_state)
         X_under, y_under = under_sam.fit_resample(X, y)
         return X_under, y_under
     elif len(under) == 0:
         dict_over = dict(zip(over, [n for i in range(len(over))]))
-        over_sam = SMOTE(sampling_strategy=dict_over)
+        over_sam = SMOTE(sampling_strategy=dict_over, random_state=random_state)
         X_over, y_over = over_sam.fit_resample(X, y)
         return X_over, y_over
     else:
@@ -139,7 +200,7 @@ def balance_sampling(X, y, n=100):
             dict_over[over[0]] = n
             dict_over[10000] = n
             is_over = np.in1d(y, over)
-            over_sam = SMOTE(sampling_strategy=dict_over)
+            over_sam = SMOTE(sampling_strategy=dict_over, random_state=random_state)
             is_over = np.in1d(y, over)
             X_over_, y_over_ = over_sam.fit_resample(np.concatenate((X[is_over], pseudo_X)),
                                                      np.concatenate((y[is_over], pseudo_y)))
@@ -148,7 +209,7 @@ def balance_sampling(X, y, n=100):
 
         else:
             dict_over = dict(zip(over, [n for i in range(len(over))]))
-            over_sam = SMOTE(sampling_strategy=dict_over)
+            over_sam = SMOTE(sampling_strategy=dict_over, random_state=random_state)
             is_over = np.in1d(y, over)
             X_over, y_over = over_sam.fit_resample(X[is_over], y[is_over])
 
@@ -160,7 +221,7 @@ def balance_sampling(X, y, n=100):
             dict_under[under[0]] = n
             dict_under[10000] = n
             is_under = np.in1d(y, under)
-            under_sam = RandomUnderSampler(sampling_strategy=dict_under)
+            under_sam = RandomUnderSampler(sampling_strategy=dict_under, random_state=random_state)
             is_under = np.in1d(y, under)
             X_under_, y_under_ = under_sam.fit_resample(np.concatenate((X[is_under], pseudo_X)),
                                                         np.concatenate((y[is_under], pseudo_y)))
@@ -168,7 +229,7 @@ def balance_sampling(X, y, n=100):
             y_under = y_under_[y_under_==under[0]]
         else:
             dict_under = dict(zip(under, [n for i in range(len(under))]))
-            under_sam = RandomUnderSampler(sampling_strategy=dict_under)
+            under_sam = RandomUnderSampler(sampling_strategy=dict_under, random_state=random_state)
             is_under = np.in1d(y, under)
             X_under, y_under = under_sam.fit_resample(X[is_under], y[is_under])
 
@@ -198,11 +259,28 @@ def get_all(results, to_csv, PATH_out):
     :param results: dataframe with true test labels and predictions as produced by Wrapper.run_mode()
     :param to_csv: whether to write csv
     :param PATH_out: path to write to
-    :return:
+    :return: dataframe of scores per masked combination
     """
     n_missing = results.shape[1] - 4
     unique_classes = set(results["y_true"])
     combs = list(combinations(unique_classes, n_missing))
+    return get_all_for_desc(results, combs, to_csv, PATH_out)
+
+
+def get_all_for_desc(results, combs, to_csv, PATH_out):
+    """
+    Calculates all performance scores for an explicit list of masked combinations.
+
+    Used by SATL.run_desc(), where the number of masked classes varies per sweep
+    step and the combinations are built from the source classes -- so they cannot
+    be re-derived from the classes present in `results["y_true"]`.
+
+    :param results: dataframe with true test labels and predictions as produced by Wrapper.run_mode()
+    :param combs: list of masked-class combinations that were actually run
+    :param to_csv: whether to write csv
+    :param PATH_out: path to write to
+    :return: dataframe of scores per masked combination
+    """
     cols = ["Missing", "alpha", "H", "Acc_known", "Acc_unknown", "H_semi", "Acc_known_semi", "Acc_unknown_semi"]
     missing = []
     alpha = []
@@ -215,7 +293,9 @@ def get_all(results, to_csv, PATH_out):
     for i in combs:
         selected = select_run(results, list(i))
         h, acc_known, acc_unknown = h_score(selected["y_true"].to_numpy(dtype="int32"), selected["y_pred"].to_numpy(dtype="int32"), list(i))
-        missing.append(str(i))
+        # normalise to plain ints: `combs` may carry numpy scalars (from
+        # set() over an int array), which render as "(np.int32(0), ...)"
+        missing.append(str(tuple(int(c) for c in i)))
         alpha.append(selected["alpha"].iloc[0])
         h_list.append(h)
         known_list.append(acc_known)
@@ -234,11 +314,12 @@ def get_all(results, to_csv, PATH_out):
     return scores
 
 
-def plot_latent(z_source, source_labels, z_target, hy_test, pred, remove_col, filename):
+def plot_latent(z_source, source_labels, z_target, hy_test, pred, remove_col, filename,
+                random_state=None):
     fig, (ax0,ax1,ax2,ax3) = plt.subplots(4,1, figsize=(3, 12), sharex=True, sharey=True)
 
     #print(z_source.shape) #11*3300
-    latent_space = TSNE(n_components=2) 
+    latent_space = TSNE(n_components=2, random_state=random_state)
     latent_df = latent_space.fit_transform(np.concatenate([np.array(z_source.T), np.array(z_target.T)],axis=0))
     #print(latent_df.shape) # 4323 *2
     z_source = latent_df[:len(z_source.T),:].T

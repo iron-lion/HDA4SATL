@@ -17,6 +17,7 @@ def main(args, prefixname):
     root_dir = "./dataset/"
     organ = args['organ']
     prep =  args['prep']
+    set_seed(args['seed'])   # was declared in the scenario dict but never applied
     dataset = preset_mousehuman_load(root_dir,  organ, prep)
 
     results = {

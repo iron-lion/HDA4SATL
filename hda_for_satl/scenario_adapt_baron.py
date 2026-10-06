@@ -43,7 +43,7 @@ def main(seed, args):
     model = scenario['model']
     name_model = scenario['name_model']
 
-    random.seed(seed)
+    set_seed(seed)
         
     path = f'./results/adapt_baron_norm/{name_model}_mouse-human_pca_{pca_dim}_numdel_{num_to_del}_seed_{seed}.json'
     if os.path.exists(path):
@@ -51,7 +51,7 @@ def main(seed, args):
         return
 
     root_dir = './dataset/baron_norm/'
-    latent_space = PCA(n_components=pca_dim)
+    latent_space = PCA(n_components=pca_dim, random_state=seed)
     dataset, label_set = baron_load(root_dir, latent_space)
     
     results = {
@@ -67,13 +67,13 @@ def main(seed, args):
         X_seen, X_unseen, y_seen, y_unseen = split_masked_cells(dataset['X_train'], dataset['y_train'], masked_cells=remove_col)
 
         if name_model == 'TransferTree':
-            s_model = DecisionTreeClassifier().fit(dataset['X_source'], dataset['y_source'])
+            s_model = DecisionTreeClassifier(random_state=seed).fit(dataset['X_source'], dataset['y_source'])
             model = TransferTreeClassifier(s_model)
 
             model.fit(X_seen, y_seen)
 
         elif name_model == 'TransferForest':
-            s_model = RandomForestClassifier().fit(dataset['X_source'], dataset['y_source'])
+            s_model = RandomForestClassifier(random_state=seed).fit(dataset['X_source'], dataset['y_source'])
             model = TransferForestClassifier(s_model)
 
             model.fit(X_seen, y_seen)
