@@ -44,7 +44,11 @@ def main(n_jobs:int, scenario:dict):
                     out_dir,
                     2, 
                     dim=ndim, 
-                    alpha=[0.01, 0.1, 1, 10, 100],
+                    # Single alpha: a per-combination CV over this grid cost 175x more and scored
+                    # slightly WORSE than a fixed value on Baron (mean H 0.652 vs 0.669); it selects
+                    # on noise. Mean H varies <=0.08 across the whole grid. Grid kept for reference.
+                    # alpha=[0.01, 0.1, 1, 10, 100]
+                    alpha=[0.1],
                     n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK, feature_analysis=True, seed=seed)
     run_all.run_mode()
 

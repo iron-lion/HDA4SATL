@@ -42,7 +42,10 @@ def main(n_jobs:int, scenario:dict):
     
     run_all = SATL(dataset,
             out_dir,
-            num_to_del, dim=ndim, alpha=[0.01, 0.1, 1, 10, 100],
+            # Single alpha; see scenario_satl_baron.py. On LPS the grid is flat to
+            # <=0.001 H across all 6 species pairs tested, so the value is immaterial.
+            # alpha=[0.01, 0.1, 1, 10, 100]
+            num_to_del, dim=ndim, alpha=[1],
             n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK, feature_analysis=True, seed=seed)
     run_all.run_mode(False)
 

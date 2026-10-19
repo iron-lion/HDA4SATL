@@ -465,4 +465,4 @@ class CAE(nn.Module):
 
         plt.legend(loc='lower left', bbox_to_anchor=(1, 0.01))
         plt.savefig(filename)
-        plt.clf()
+        plt.close(fig)

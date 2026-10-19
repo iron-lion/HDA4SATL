@@ -34,7 +34,11 @@ def main(n_jobs:int, scenario:dict):
                     out_dir,
                     2, 
                     dim=ndim, 
-                    alpha=[0.01, 0.1, 1, 10, 100],
+                    # Single alpha; see scenario_satl_baron.py. 0.01 won 4 of the 9
+                    # organ/prep configs; mean spread across the grid was 0.050 and
+                    # three configs were flat to <0.005.
+                    # alpha=[0.01, 0.1, 1, 10, 100]
+                    alpha=[0.01],
                     n_resample_source=oversample, n_resample_target=oversample, n_jobs = n_jobs, K=thisK, feature_analysis=False, seed=seed)
     run_all.run_mode()
 

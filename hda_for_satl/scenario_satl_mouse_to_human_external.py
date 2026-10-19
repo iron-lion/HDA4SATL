@@ -46,7 +46,9 @@ def main(n_jobs:int, scenario:dict):
                     out_dir,
                     2, 
                     dim=ndim, 
-                    alpha=[0.01, 0.05, 0.1, 1, 10, 100],
+                    # Same Baron mouse->human fit as scenario_satl_baron.py; see there.
+                    # alpha=[0.01, 0.05, 0.1, 1, 10, 100]
+                    alpha=[0.1],
                     n_resample_source=oversample, n_resample_target=-1, n_jobs = n_jobs, K=thisK, feature_analysis=False, seed=seed)
     run_all.run_mode_indiv()
 
